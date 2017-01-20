@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/jrainlau/sphinx/issues"
   },
-  "homepage": "https://github.com/jrainlau/sphinx#readme"
+  "homepage": "https://github.com/jrainlau/sphinx#readme",
+  "devDependencies": {
+    "qunitjs": "^2.1.1"
+  }
 }

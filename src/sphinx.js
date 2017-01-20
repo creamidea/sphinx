@@ -6,6 +6,7 @@
 ;(() => {
 
   const encodeUTF8 = Symbol('encodeUTF8')
+  const decodeUTF8 = Symbol('decodeUTF8')
   /**
    * Construct a new Sphinx instance by passing the configuration object
    *
@@ -18,48 +19,11 @@
     }
 
     [encodeUTF8] (str) {
-      return str
-	.replace(/[\u0080-\u07ff]/g, (s) => {
-	  let _s = s.charCodeAt(0)
-	  return String.fromCharCode(0xc0 | _s >> 6, 0x80 | _s & 0x3f)
-	})
-	.replace(/[\u0800-\uffff]/g, (s) => {
-	  let _s = s.charCodeAt(0)
-	  return String.fromCharCode(0xe0 | _s >> 12, 0x80 | _s >> 6 & 0x3f, 0x80 | _s & 0x3f)
-	})
+      return unescape(encodeURIComponent(str))
     }
 
-    decodeUTF8 (code) {
-      // http://creamidea.github.io/static/html/articles/Unicode-And-UTF8.html#org5ae6e83
-      let container = [], // 存储 unicode 的容器
-          c, // 当前字节
-          next, // 下一个字节
-          i = -1 // 循环指示器
-
-      while((c = code.charCodeAt(++i))) {
-        // c = 255 时，不会进入这里
-        // 所以也就不需要比较 i % 4 === 0
-        if ( c < 128) {
-          // 0XXXX XXXX
-          c = 0x7f & c
-        } else if (c < 224) {
-          // 110X XXXX
-          c = ((0x1f & c) << 6)
-          // TODO: 这里也许有爆栈的可能
-          while (isNaN(next = code.charCodeAt(++i))) continue
-          c = c | (0x3f & next)
-        } else if (c < 240) {
-          // 1110 XXXX
-          c = ((0x0f & c) << 12)
-          while (isNaN(next = code.charCodeAt(++i))) continue
-          c = c | ((0x3f & next) << 6)
-          while (isNaN(next = code.charCodeAt(++i))) continue
-          c = c | (0x3f & next)
-        }
-        container.push(c)
-      }
-
-      return String.fromCharCode.apply(null, container)
+    [decodeUTF8] (code) {
+      return decodeURIComponent(escape(code))
     }
 
     /**
@@ -105,7 +69,6 @@
         buffer = buffer.concat(padding[buffer.length % 4 - 1])
       }
       return buffer
-      // console.log(buffer)
     }
 
     encode (str) {
@@ -140,21 +103,30 @@
 
       return new Promise ((resolve, reject) => {
 	img.onload = () => {
-	  let canvas = document.createElement('canvas')
+	  let canvas,
+              ctx,
+              imgData,
+              decodeArr = []
+
+          canvas = document.createElement('canvas')
 	  canvas.width = img.width
 	  canvas.height = img.height
 
-	  let ctx = canvas.getContext("2d")
+	  ctx = canvas.getContext("2d")
 	  ctx.drawImage(img, 0, 0)
-	  let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
 
-	  let decodeArr = []
-	  for (let i = 0, l = imgData.data.length; i < l; i++) {
-	    if (i % 4 == 3) continue
-	    if (!imgData.data[i]) break
-	    decodeArr.push(String.fromCharCode(imgData.data[i]))
-	  }
-	  resolve(decodeURIComponent(decodeArr.join('')))
+	  imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+
+          resolve(
+            this[decodeUTF8](
+              String.fromCharCode.apply(
+                null,
+                imgData.filter( (v, i) => {
+                  return ( i + 1) % 4 !== 0
+                })
+              )
+            )
+          )
 	}
       })
     }
